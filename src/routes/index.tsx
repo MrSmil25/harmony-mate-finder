@@ -2,9 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3,
   Download, ExternalLink, FileText, Flag, GraduationCap, Hand, Home, Library, Link2, ListTodo,
-  MapPin, Milestone, MoreHorizontal, Paperclip, Pencil, Plus, Save, Search, Trash2, UserRound, X,
+  MapPin, Milestone, MoreHorizontal, NotebookPen, Paperclip, Pencil, Plus, Save, Search, Settings, Trash2, UserRound, X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,8 +24,29 @@ import { degreeProgress, useSetup, type StudentSetup } from "@/data/setup";
 import { courseByCode, type CurriculumCourse } from "@/data/curriculum";
 import { academicYearLabel, useSemesterData, type AssistantSession, type CourseLink } from "@/data/semester";
 import { AssistantSessionList, AssistantSessionsPanel, CourseLinksPanel, SemesterArchivePanel, SemesterWorkspaceCard } from "@/components/semester-workspace";
+import { EmptyState } from "@/components/empty-state";
+import { SettingsView } from "@/components/settings";
+import type { AcademicExport } from "@/lib/export-data";
 
-type View = "home" | "courses" | "calendar" | "tasks" | "library";
+type View = "home" | "courses" | "calendar" | "tasks" | "library" | "settings";
+
+const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** Local clock for greeting and date, resolved after hydration to avoid SSR drift. */
+function useNow() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const hour = now?.getHours() ?? 8;
+  return {
+    greeting: hour < 11 ? "Good morning" : hour < 15 ? "Good afternoon" : hour < 19 ? "Good evening" : "Good night",
+    dayName: now ? weekdayNames[now.getDay()]! : "Wednesday",
+    dateLabel: now ? now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }) : "Wednesday, 16 September",
+  };
+}
 type TaskCategory = "Accounting" | "Marketing" | "Entrepreneurship" | "Research";
 type TaskStatus = "Not started" | "In progress" | "Completed";
 type ChecklistItem = { id: number; label: string; done: boolean };
@@ -276,6 +297,17 @@ function AcademicApp() {
   const updateTask = (id: number, patch: Partial<Task>) => setTasks((items) => items.map((task) => task.id === id ? { ...task, ...patch } : task));
   const addTask = (task: Task) => setTasks((items) => [task, ...items]);
 
+  const exportData = useMemo<AcademicExport>(() => {
+    const stats = degreeProgress(setup?.completed ?? []);
+    return {
+      courses: myCourses.map((course) => ({ code: course.code, title: course.title, sks: course.sks, ...(course.section ? { section: course.section } : {}), lecturer: course.lecturer, assistant: course.assistant, day: course.day, time: course.time, room: course.room })),
+      tasks: tasks.map((task) => ({ title: task.title, course: task.course, due: task.dueDate || task.due, priority: task.priority, status: task.status, done: task.done })),
+      notes: myCourses.flatMap((course) => course.notes.map((note) => ({ title: note.title, topic: note.topic, course: course.title, body: note.body }))),
+      resources: myCourses.flatMap((course) => course.materials.map((material) => ({ title: material.title, type: material.type, course: course.title, detail: material.attachment }))),
+      progress: { currentSemester: setup?.currentSemester ?? studentProfile.currentSemester, completedSks: stats.completedSks, remainingSks: stats.remainingSks, totalSks: stats.totalSks, percent: stats.percent, completedCourses: setup?.completed ?? [] },
+    };
+  }, [myCourses, tasks, setup]);
+
   const openCourseByCode = (code: string) => {
     const found = myCourses.find((course) => course.code === code);
     if (found) { setExam(null); setJourney(false); setWorkspace(found); window.scrollTo({ top: 0, behavior: "smooth" }); }
@@ -289,15 +321,16 @@ function AcademicApp() {
 
   return (
     <div className="min-h-screen bg-background pb-24 text-foreground md:pb-8">
-      <DesktopHeader view={view} navigate={navigate} onSearch={() => setSearchOpen(true)} onNotifications={() => setNotifOpen(true)} notificationCount={notifications.length} />
+      <DesktopHeader view={view} navigate={navigate} onSearch={() => setSearchOpen(true)} onNotifications={() => setNotifOpen(true)} notificationCount={notifications.length} onSettings={() => navigate("settings")} />
       <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 md:py-8">
         {exam ? <StudyCommandCenter event={exam} onBack={() => setExam(null)} sessions={studySessions} onAddSession={addStudySession} onRemoveSession={removeStudySession} /> : workspace ? <CourseWorkspace course={workspace} onBack={() => setWorkspace(null)} onOpenExam={openExamForCourse} links={semesterData.links.filter((link) => link.code === workspace.code)} onAddLink={semesterData.addLink} onRemoveLink={semesterData.removeLink} sessions={semesterData.sessions.filter((session) => session.code === workspace.code)} onAddSession={semesterData.addSession} onRemoveSession={semesterData.removeSession} /> : journey ? <AcademicJourney onBack={() => setJourney(false)} onOpenCourse={openCurriculumCourse} setup={setup} /> : (
           <div key={view} className="page-enter">
-            {view === "home" && <HomeView tasks={tasks} toggleTask={toggleTask} navigate={navigate} onOpenExam={setExam} onOpenJourney={() => { setJourney(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} onSearch={() => setSearchOpen(true)} onNotifications={() => setNotifOpen(true)} notificationCount={notifications.length} studySessions={studySessions.length} resourcesAdded={resourcesAdded + notesAdded} profile={setup} myCourses={myCourses} onEditSetup={resetSetup} semesterData={semesterData} />}
+            {view === "home" && <HomeView tasks={tasks} toggleTask={toggleTask} navigate={navigate} onOpenExam={setExam} onOpenJourney={() => { setJourney(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} onSearch={() => setSearchOpen(true)} onNotifications={() => setNotifOpen(true)} notificationCount={notifications.length} studySessions={studySessions.length} resourcesAdded={resourcesAdded + notesAdded} profile={setup} myCourses={myCourses} onEditSetup={resetSetup} semesterData={semesterData} onSettings={() => navigate("settings")} />}
             {view === "courses" && <CoursesView onOpen={setWorkspace} courses={myCourses} semesterLabel={setup ? `Semester ${setup.currentSemester}` : "Semester Gasal 2026/2027"} />}
             {view === "calendar" && <CalendarView studySessions={studySessions} assistantSessions={semesterData.sessions} />}
             {view === "tasks" && <TasksView tasks={tasks} toggleTask={toggleTask} updateTask={updateTask} addTask={addTask} navigate={navigate} />}
             {view === "library" && <LibraryView />}
+            {view === "settings" && <SettingsView setup={setup} data={exportData} progress={degreeProgress(setup?.completed ?? [])} onBack={() => navigate("home")} onEditSetup={resetSetup} />}
           </div>
         )}
       </main>
@@ -316,6 +349,15 @@ function AcademicApp() {
         onAddNote={() => setNotesAdded((count) => count + 1)}
         onAddResource={() => setResourcesAdded((count) => count + 1)}
         onAddSession={({ day, date, time, duration, topic }) => addStudySession({ eventId: exam?.id ?? 1, day, date, time, duration, topic })}
+        onAddCourse={({ name, provider, sks, day, time, room }) => {
+          if (!setup) return;
+          const custom = {
+            code: `EXTRA-${Date.now()}`, name, faculty: provider, sks,
+            lecturer: provider, day: (day as StudentSetup["active"][number]["day"]), start: time.split(" – ")[0] ?? "08:00",
+            end: time.split(" – ")[1] ?? "10:00", room, countsTowardGraduation: false,
+          };
+          saveSetup({ ...setup, customCourses: [...(setup.customCourses ?? []), custom] });
+        }}
       />
 
       <GlobalSearch
@@ -335,8 +377,8 @@ function Brand() {
   return <div className="flex min-w-0 items-center gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground"><GraduationCap className="size-5" /></div><div className="min-w-0"><p className="font-display text-sm font-bold">RASYID ACADEMIC</p><p className="truncate text-xs text-muted-foreground">{studentProfile.university}</p></div></div>;
 }
 
-function DesktopHeader({ view, navigate, onSearch, onNotifications, notificationCount }: { view: View; navigate: (view: View) => void; onSearch: () => void; onNotifications: () => void; notificationCount: number }) {
-  return <header className="sticky top-0 z-30 hidden border-b border-border bg-surface/95 backdrop-blur md:block"><div className="mx-auto flex h-18 max-w-6xl items-center justify-between px-6"><Brand /><nav className="flex gap-1">{navItems.map(({ id, label }) => <Button key={id} variant={view === id ? "academic" : "ghost"} onClick={() => navigate(id)}>{label}</Button>)}</nav><div className="flex items-center gap-2"><button onClick={onSearch} aria-label="Search" className="grid size-9 place-items-center rounded-full bg-muted text-academic transition-colors hover:bg-accent"><Search className="size-4" /></button><NotificationBell count={notificationCount} onClick={onNotifications} /><div className="grid size-9 place-items-center rounded-full bg-academic text-sm font-bold text-academic-foreground">{studentProfile.initials}</div></div></div></header>;
+function DesktopHeader({ view, navigate, onSearch, onNotifications, notificationCount, onSettings }: { view: View; navigate: (view: View) => void; onSearch: () => void; onNotifications: () => void; notificationCount: number; onSettings: () => void }) {
+  return <header className="sticky top-0 z-30 hidden border-b border-border bg-surface/95 backdrop-blur md:block"><div className="mx-auto flex h-18 max-w-6xl items-center justify-between px-6"><Brand /><nav className="flex gap-1">{navItems.map(({ id, label }) => <Button key={id} variant={view === id ? "academic" : "ghost"} onClick={() => navigate(id)}>{label}</Button>)}</nav><div className="flex items-center gap-2"><button onClick={onSearch} aria-label="Search" className="grid size-9 place-items-center rounded-full bg-muted text-academic transition-colors hover:bg-accent"><Search className="size-4" /></button><NotificationBell count={notificationCount} onClick={onNotifications} /><button onClick={onSettings} aria-label="Settings" className={`grid size-9 place-items-center rounded-full transition-colors ${view === "settings" ? "bg-academic text-academic-foreground" : "bg-muted text-academic hover:bg-accent"}`}><Settings className="size-4" /></button><button onClick={onSettings} aria-label="Your profile" className="grid size-9 place-items-center rounded-full bg-academic text-sm font-bold text-academic-foreground">{studentProfile.initials}</button></div></div></header>;
 }
 
 
@@ -354,7 +396,8 @@ function MobileTop({ eyebrow, title, action }: { eyebrow: string; title: React.R
 
 function SectionHeader({ title, action }: { title: string; action?: React.ReactNode }) { return <div className="mb-3 flex items-center justify-between gap-3"><h2 className="text-base font-bold md:text-lg">{title}</h2>{action}</div>; }
 
-function HomeView({ tasks, toggleTask, navigate, onOpenExam, onOpenJourney, onSearch, onNotifications, notificationCount, studySessions, resourcesAdded, profile, myCourses, onEditSetup, semesterData }: { tasks: Task[]; toggleTask: (id: number) => void; navigate: (view: View) => void; onOpenExam: (exam: Exam) => void; onOpenJourney: () => void; onSearch: () => void; onNotifications: () => void; notificationCount: number; studySessions: number; resourcesAdded: number; profile: StudentSetup | null; myCourses: Course[]; onEditSetup: () => void; semesterData: ReturnType<typeof useSemesterData> }) {
+function HomeView({ tasks, toggleTask, navigate, onOpenExam, onOpenJourney, onSearch, onNotifications, notificationCount, studySessions, resourcesAdded, profile, myCourses, onEditSetup, semesterData, onSettings }: { tasks: Task[]; toggleTask: (id: number) => void; navigate: (view: View) => void; onOpenExam: (exam: Exam) => void; onOpenJourney: () => void; onSearch: () => void; onNotifications: () => void; notificationCount: number; studySessions: number; resourcesAdded: number; profile: StudentSetup | null; myCourses: Course[]; onEditSetup: () => void; semesterData: ReturnType<typeof useSemesterData>; onSettings: () => void }) {
+  const { greeting, dayName, dateLabel } = useNow();
   const openTasks = tasks.filter((task) => !task.done);
   const featuredTask = openTasks[0];
   const quickActions = navItems.filter((item) => item.id !== "home");
@@ -363,7 +406,7 @@ function HomeView({ tasks, toggleTask, navigate, onOpenExam, onOpenJourney, onSe
     { label: "Tomorrow", day: "Thursday", time: "08:00 – 10:30", title: "Perencanaan Pemasaran", room: "B.110", color: "bg-primary" },
     { label: "Tomorrow", day: "Thursday", time: "14:00 – 16:30", title: "Metode Riset Bisnis", room: "B.101", color: "bg-warning" },
   ];
-  const todayName = "Wednesday";
+  const todayName = dayName;
   const todayClasses = profile ? myCourses.filter((course) => course.day === todayName) : [];
   const upcoming = profile
     ? myCourses.slice(0, 4).map((course) => ({ label: course.day === todayName ? "Today" : "This week", day: `${course.day} · Class ${course.section ?? "-"}`, time: course.time, title: course.title, room: course.room, color: course.accent }))
@@ -374,10 +417,10 @@ function HomeView({ tasks, toggleTask, navigate, onOpenExam, onOpenJourney, onSe
   const activeSks = myCourses.reduce((total, course) => total + course.sks, 0);
 
   return <div>
-    <MobileTop eyebrow="Wednesday, 16 September" title={<>Good Morning, {studentName} <Hand aria-label="waving hand" className="size-5 text-warning" /></>} action={<div className="flex items-center gap-2"><button onClick={onSearch} aria-label="Search" className="grid size-9 place-items-center rounded-full bg-muted text-academic"><Search className="size-4" /></button><NotificationBell count={notificationCount} onClick={onNotifications} /><div className="grid size-10 place-items-center rounded-full bg-academic text-xs font-bold text-academic-foreground">{studentProfile.initials}</div></div>} />
+    <MobileTop eyebrow={dateLabel} title={<>{greeting}, {studentName.split(" ")[0]} <Hand aria-label="waving hand" className="size-5 text-warning" /></>} action={<div className="flex items-center gap-2"><button onClick={onSearch} aria-label="Search" className="grid size-9 place-items-center rounded-full bg-muted text-academic"><Search className="size-4" /></button><NotificationBell count={notificationCount} onClick={onNotifications} /><button onClick={onSettings} aria-label="Your profile and settings" className="grid size-10 place-items-center rounded-full bg-academic text-xs font-bold text-academic-foreground">{studentProfile.initials}</button></div>} />
     <section className="mb-8 overflow-hidden rounded-2xl bg-academic p-5 text-academic-foreground shadow-lg md:p-8">
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-        <div className="min-w-0"><div className="flex items-center gap-2 text-xs font-semibold opacity-80"><span className="size-2 rounded-full bg-primary" />SEMESTER GASAL 2026/2027</div><h1 className="mt-3 hidden items-center gap-3 text-3xl font-bold md:flex">Good Morning, {studentName} <Hand aria-label="waving hand" className="size-7 text-primary" /></h1><p className="mt-2 text-sm opacity-85">{profile?.program ?? studentProfile.program} · {profile?.faculty ?? studentProfile.faculty} · {profile?.university ?? studentProfile.university}</p><p className="mt-1 text-xs opacity-70">Angkatan {profile?.entryYear ?? studentProfile.entryYear} · Semester {semesterNumber} · {profile ? `${myCourses.length} active courses · ${activeSks} SKS` : `Target GPA ${studentProfile.targetGpa.toFixed(2)}`}</p>{profile && <button onClick={onEditSetup} className="mt-3 rounded-full bg-academic-foreground/15 px-3 py-1 text-[11px] font-semibold">Edit academic setup</button>}</div>
+        <div className="min-w-0"><div className="flex flex-wrap items-center gap-2 text-xs font-semibold opacity-80"><span className="size-2 rounded-full bg-primary" />SEMESTER {semesterNumber} · {academicYearLabel(profile?.entryYear ?? studentProfile.entryYear, semesterNumber).toUpperCase()}<span className="opacity-60">· {dateLabel}</span></div><h1 className="mt-3 hidden items-center gap-3 text-3xl font-bold md:flex">{greeting}, {studentName.split(" ")[0]} <Hand aria-label="waving hand" className="size-7 text-primary" /></h1><p className="mt-2 text-sm opacity-85">{profile?.program ?? studentProfile.program} · {profile?.faculty ?? studentProfile.faculty} · {profile?.university ?? studentProfile.university}</p><p className="mt-1 text-xs opacity-70">Angkatan {profile?.entryYear ?? studentProfile.entryYear} · Semester {semesterNumber} · {profile ? `${myCourses.length} active courses · ${activeSks} SKS · ${openTasks.length} open tasks` : `Target GPA ${studentProfile.targetGpa.toFixed(2)}`}</p><div className="mt-3 flex flex-wrap gap-2">{profile && <button onClick={onEditSetup} className="rounded-full bg-academic-foreground/15 px-3 py-1 text-[11px] font-semibold">Edit academic setup</button>}<button onClick={onSettings} className="rounded-full bg-academic-foreground/15 px-3 py-1 text-[11px] font-semibold">Workspace settings</button></div></div>
         <div className="grid grid-cols-3 gap-2 md:min-w-80"><DashboardStat label="Current semester" value={`Semester ${semesterNumber}`} /><DashboardStat label="Completed credits" value={profile ? `${progressStats.completedSks} SKS` : "24 SKS"} /><DashboardStat label="Degree progress" value={profile ? `${progressStats.percent}%` : "60%"} /></div>
       </div>
       <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-academic-foreground/20"><div className="h-full rounded-full bg-primary" style={{ width: `${profile ? progressStats.percent : 60}%` }} /></div>
@@ -392,9 +435,20 @@ function HomeView({ tasks, toggleTask, navigate, onOpenExam, onOpenJourney, onSe
 
       <section><SectionHeader title="Upcoming classes" /><div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">{upcoming.map((item) => <article key={item.time + item.title} className="academic-card min-w-[78%] snap-start overflow-hidden sm:min-w-72"><div className={`h-1.5 ${item.color}`} /><div className="p-4"><div className="flex items-center justify-between text-xs"><span className="font-semibold text-academic">{item.label}</span><span className="text-muted-foreground">{item.day}</span></div><h3 className="mt-4 min-h-10 text-sm font-bold leading-5">{item.title}</h3><div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-xs text-muted-foreground"><span className="flex items-center gap-1.5"><Clock3 className="size-3.5" />{item.time}</span><span className="flex items-center gap-1.5"><MapPin className="size-3.5" />{item.room}</span></div></div></article>)}</div></section>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.85fr)]"><section><SectionHeader title="Task center" action={<button onClick={() => navigate("tasks")} className="text-xs font-semibold text-academic">All tasks · {openTasks.length}</button>} />{featuredTask ? <article className="academic-card p-5"><div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3"><button onClick={() => toggleTask(featuredTask.id)} aria-label={`Complete ${featuredTask.title}`} className="mt-0.5 grid size-6 place-items-center rounded-full border border-input bg-background" /><div className="min-w-0"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-base font-bold">{featuredTask.title}</h3><p className="mt-1 text-xs text-muted-foreground">{featuredTask.course}</p></div><div className="flex gap-2"><span className="rounded-full bg-accent px-2.5 py-1 text-[10px] font-semibold text-academic">Due {featuredTask.due}</span><span className="rounded-full bg-destructive/10 px-2.5 py-1 text-[10px] font-semibold text-destructive">{featuredTask.priority}</span></div></div><div className="mt-5 flex items-center gap-3"><Progress value={60} className="h-2 flex-1" /><span className="text-xs font-bold text-academic">60%</span></div></div></div></article> : <div className="academic-card p-6 text-center text-sm text-muted-foreground">Everything is complete. You’re ready for class.</div>}</section>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.85fr)]"><section><SectionHeader title="Task center" action={<button onClick={() => navigate("tasks")} className="text-xs font-semibold text-academic">All tasks · {openTasks.length}</button>} />{featuredTask ? <article className="academic-card p-5"><div className="grid grid-cols-[auto_minmax(0,1fr)] gap-3"><button onClick={() => toggleTask(featuredTask.id)} aria-label={`Complete ${featuredTask.title}`} className="mt-0.5 grid size-6 place-items-center rounded-full border border-input bg-background" /><div className="min-w-0"><div className="flex flex-wrap items-start justify-between gap-2"><div><h3 className="text-base font-bold">{featuredTask.title}</h3><p className="mt-1 text-xs text-muted-foreground">{featuredTask.course}</p></div><div className="flex gap-2"><span className="rounded-full bg-accent px-2.5 py-1 text-[10px] font-semibold text-academic">Due {featuredTask.due}</span><span className="rounded-full bg-destructive/10 px-2.5 py-1 text-[10px] font-semibold text-destructive">{featuredTask.priority}</span></div></div><div className="mt-5 flex items-center gap-3"><Progress value={featuredTask.checklist.length ? Math.round((featuredTask.checklist.filter((item) => item.done).length / featuredTask.checklist.length) * 100) : 0} className="h-2 flex-1" /><span className="text-xs font-bold text-academic">{featuredTask.checklist.length ? Math.round((featuredTask.checklist.filter((item) => item.done).length / featuredTask.checklist.length) * 100) : 0}%</span></div></div></div></article> : <EmptyState
+        icon={ListTodo}
+        eyebrow="Task center"
+        title={tasks.length ? "Every assignment is done" : "No assignment is tracked yet"}
+        description={tasks.length ? "Nothing is waiting for you right now. Plan a study block, or look ahead at what the next weeks bring." : "Add your first assignment so deadlines, checklists, and course materials stay in one place instead of scattered across chats."}
+        actions={[
+          { label: tasks.length ? "Plan the week" : "Create first task", icon: Plus, onClick: () => navigate("tasks") },
+          { label: "Open calendar", icon: CalendarDays, onClick: () => navigate("calendar") },
+        ]}
+        hints={["Tasks can hold a checklist, files, and links", "Quick add (+) creates a task from any page"]}
+        compact
+      />}</section>
 
-        <section><SectionHeader title="Academic progress" /><div className="academic-card p-5"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Semester progress</p><p className="mt-1 font-display text-3xl font-bold">60%</p></div><div className="grid size-16 place-items-center rounded-full border-8 border-accent text-xs font-bold text-academic">60%</div></div><Progress value={60} className="mt-5 h-2" /><div className="mt-5 grid grid-cols-3 gap-2"><Metric label="Completed SKS" value="14" /><Metric label="Courses" value="8" /><Metric label="Tasks left" value={String(openTasks.length)} /></div></div></section></div>
+        <section><SectionHeader title="Academic progress" /><div className="academic-card p-5"><div className="flex items-center justify-between"><div><p className="text-xs text-muted-foreground">Degree progress · Semester {semesterNumber}</p><p className="mt-1 font-display text-3xl font-bold">{progressStats.percent}%</p></div><div className="grid size-16 place-items-center rounded-full border-8 border-accent text-xs font-bold text-academic">{progressStats.percent}%</div></div><Progress value={progressStats.percent} className="mt-5 h-2" /><div className="mt-5 grid grid-cols-3 gap-2"><Metric label="Completed SKS" value={String(progressStats.completedSks)} /><Metric label="Active courses" value={String(myCourses.length)} /><Metric label="Tasks left" value={String(openTasks.length)} /></div><button onClick={onOpenJourney} className="mt-4 w-full rounded-xl bg-muted py-2.5 text-xs font-semibold text-academic">See academic journey</button></div></section></div>
 
       <SemesterArchivePanel archive={semesterData.archive} suggestion={{ semester: semesterNumber, academicYear: academicYearLabel(profile?.entryYear ?? studentProfile.entryYear, semesterNumber), courses: myCourses.map((course) => course.code), sks: activeSks, resources: resourcesAdded, completedTasks: tasks.filter((task) => task.done).length }} onAdd={semesterData.addArchive} onRemove={semesterData.removeArchive} />
 

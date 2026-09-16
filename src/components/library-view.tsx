@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EmptyState } from "@/components/empty-state";
 
 type ResourceType = "Books" | "Lecture Slides" | "Practice Questions" | "Articles" | "External References" | "Files";
 type WorkType = "Class summary" | "Personal note" | "Exercise answers" | "Project file" | "Study reflection";
@@ -310,7 +311,15 @@ export function LibraryView() {
           </div>
         </div>
       </button>)}
-      {!visible.length && <p className="text-sm text-muted-foreground">No course matches that search.</p>}
+      {!visible.length && <div className="md:col-span-2"><EmptyState
+        icon={Search}
+        eyebrow="Semester archive"
+        title={query ? `No course matches “${query}”` : "This semester has no archived course yet"}
+        description="Archived courses keep every material, note, and link from a semester you have finished. Search by course name, code, or lecturer."
+        actions={query ? [{ label: "Clear search", onClick: () => setQuery("") }] : []}
+        hints={["Try a course code such as ECMN600020", "Each archive keeps materials, personal work, links, and notes"]}
+        compact
+      /></div>}
     </div>
   </div>;
 }
@@ -423,7 +432,15 @@ function ClassLinksPanel({ links, onChange }: { links: ClassLink[]; onChange: (l
           <a href={link.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2.5 py-1.5 text-xs font-semibold text-academic"><ExternalLink className="size-3.5" />Open link</a>
           <button onClick={() => onChange(links.filter(item => item.id !== link.id))} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-muted-foreground"><Trash2 className="size-3.5" />Remove</button>
         </div>
-      </article>) : <p className="text-sm text-muted-foreground sm:col-span-2">No class links saved yet.</p>}
+      </article>) : <div className="sm:col-span-2"><EmptyState
+        icon={Link2}
+        eyebrow="Class links"
+        title="Keep every class link in one place"
+        description="Save the course Google Drive, class spreadsheet, LMS page, or recurring meeting room so you never search your chat history again."
+        actions={[{ label: "Add first link", icon: Plus, onClick: () => setOpen(true) }]}
+        hints={["Drive and Sheets for shared materials", "Zoom or Classroom for the weekly session"]}
+        compact
+      /></div>}
     </div>
   </section>;
 }
@@ -491,7 +508,18 @@ function ItemPanel({ title, subtitle, items, types, onChange }: { title: string;
             : <a href={item.url || "#"} download={item.title} className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2.5 py-1.5 text-xs font-semibold text-academic"><Download className="size-3.5" />Download</a>}
           <button onClick={() => onChange(items.filter(entry => entry.id !== item.id))} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-muted-foreground"><Trash2 className="size-3.5" />Remove</button>
         </div>
-      </article>) : <p className="text-sm text-muted-foreground sm:col-span-2">Nothing saved in this category yet.</p>}
+      </article>) : <div className="sm:col-span-2"><EmptyState
+        icon={FileText}
+        eyebrow={title}
+        title={filter === "All" ? `Start building your ${title.toLowerCase()}` : `Nothing filed under ${filter} yet`}
+        description={subtitle}
+        actions={[
+          { label: "Add resource", icon: Plus, onClick: () => setOpen(true) },
+          ...(filter === "All" ? [] : [{ label: "Show all types", onClick: () => setFilter("All") }]),
+        ]}
+        hints={["Upload a file or paste a link — both are searchable", "Give each item a short description so future you remembers why it matters"]}
+        compact
+      /></div>}
     </div>
   </section>;
 }
@@ -549,7 +577,15 @@ function NotesPanel({ notes, onChange }: { notes: ArchiveNote[]; onChange: (note
           {note.attachment && <span className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2.5 py-1.5 text-xs font-semibold text-academic"><Paperclip className="size-3.5" />{note.attachment}</span>}
           {note.link && <a href={note.link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2.5 py-1.5 text-xs font-semibold text-academic"><ExternalLink className="size-3.5" />Open resource</a>}
         </div>
-      </article>) : <p className="text-sm text-muted-foreground md:col-span-2">No notes yet for this course.</p>}
+      </article>) : <div className="md:col-span-2"><EmptyState
+        icon={NotebookPen}
+        eyebrow="Notes"
+        title="Your understanding lives here"
+        description="Write what you understood in your own words after each session. Notes can carry an attachment and a linked resource, and they show up in global search."
+        actions={[{ label: "Write first note", icon: Plus, onClick: () => setOpen(true) }]}
+        hints={["One note per topic or week works best", "Attach the slide or reading you took it from"]}
+        compact
+      /></div>}
     </div>
   </section>;
 }
