@@ -1,4 +1,4 @@
-import { FileText, ListTodo, NotebookPen, Plus, Timer, X } from "lucide-react";
+import { FileText, GraduationCap, ListTodo, NotebookPen, Plus, Timer, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,26 +8,30 @@ export type QuickTask = { title: string; course: string; due: string };
 export type QuickNote = { title: string; course: string; body: string };
 export type QuickResource = { title: string; course: string; type: string };
 export type QuickSession = { day: string; date: string; time: string; duration: string; topic: string };
+export type QuickCourse = { name: string; provider: string; sks: number; day: string; time: string; room: string };
 
-type Kind = "Task" | "Note" | "Resource" | "Study session";
+type Kind = "Task" | "Note" | "Resource" | "Study session" | "Custom course";
 
-const kinds: { id: Kind; icon: typeof ListTodo }[] = [
-  { id: "Task", icon: ListTodo },
-  { id: "Note", icon: NotebookPen },
-  { id: "Resource", icon: FileText },
-  { id: "Study session", icon: Timer },
+const kinds: { id: Kind; label: string; icon: typeof ListTodo }[] = [
+  { id: "Task", label: "Task", icon: ListTodo },
+  { id: "Note", label: "Note", icon: NotebookPen },
+  { id: "Resource", label: "Resource", icon: FileText },
+  { id: "Study session", label: "Session", icon: Timer },
+  { id: "Custom course", label: "Course", icon: GraduationCap },
 ];
 
 const dayKeys = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const fullDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 export function QuickAdd({
-  courses, onAddTask, onAddNote, onAddResource, onAddSession,
+  courses, onAddTask, onAddNote, onAddResource, onAddSession, onAddCourse,
 }: {
   courses: string[];
   onAddTask: (task: QuickTask) => void;
   onAddNote: (note: QuickNote) => void;
   onAddResource: (resource: QuickResource) => void;
   onAddSession: (session: QuickSession) => void;
+  onAddCourse?: (course: QuickCourse) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>("Task");
@@ -39,9 +43,14 @@ export function QuickAdd({
   const [day, setDay] = useState("Mon");
   const [time, setTime] = useState("19:00");
   const [duration, setDuration] = useState("90 min");
+  const [provider, setProvider] = useState("");
+  const [sks, setSks] = useState("3");
+  const [courseDay, setCourseDay] = useState("Monday");
+  const [courseTime, setCourseTime] = useState("08:00 – 10:30");
+  const [room, setRoom] = useState("");
   const [message, setMessage] = useState("");
 
-  const reset = () => { setTitle(""); setDue(""); setBody(""); };
+  const reset = () => { setTitle(""); setDue(""); setBody(""); setProvider(""); setRoom(""); };
 
   const submit = () => {
     const value = title.trim();
@@ -50,10 +59,13 @@ export function QuickAdd({
     if (kind === "Note") onAddNote({ title: value, course, body: body.trim() });
     if (kind === "Resource") onAddResource({ title: value, course, type });
     if (kind === "Study session") onAddSession({ day, date: due.trim() || day, time, duration, topic: value });
+    if (kind === "Custom course") onAddCourse?.({ name: value, provider: provider.trim() || "Outside curriculum", sks: Number(sks) || 0, day: courseDay, time: courseTime, room: room.trim() });
     setMessage(`${kind} added to your workspace.`);
     reset();
     setTimeout(() => setMessage(""), 2500);
   };
+
+  const needsCourse = kind === "Task" || kind === "Note" || kind === "Resource";
 
   return (
     <>
@@ -67,7 +79,7 @@ export function QuickAdd({
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-academic/40 p-0 backdrop-blur-sm sm:items-center sm:p-6" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-lg overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}>
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-t-2xl border border-border bg-surface shadow-2xl sm:rounded-2xl" onClick={event => event.stopPropagation()}>
             <header className="flex items-center justify-between border-b border-border px-5 py-4">
               <div>
                 <h2 className="text-base font-bold">Quick add</h2>
@@ -77,21 +89,21 @@ export function QuickAdd({
             </header>
 
             <div className="space-y-4 p-5">
-              <div className="grid grid-cols-4 gap-2">
-                {kinds.map(({ id, icon: Icon }) => (
-                  <button key={id} onClick={() => setKind(id)} className={`flex min-w-0 flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-center text-[11px] font-semibold transition-colors ${kind === id ? "border-academic bg-accent text-academic" : "border-border text-muted-foreground hover:bg-muted"}`}>
+              <div className="grid grid-cols-5 gap-2">
+                {kinds.map(({ id, label, icon: Icon }) => (
+                  <button key={id} onClick={() => setKind(id)} className={`flex min-w-0 flex-col items-center gap-1.5 rounded-xl border px-1.5 py-3 text-center text-[11px] font-semibold transition-colors ${kind === id ? "border-academic bg-accent text-academic" : "border-border text-muted-foreground hover:bg-muted"}`}>
                     <Icon className="size-4" />
-                    <span className="w-full truncate">{id}</span>
+                    <span className="w-full truncate">{label}</span>
                   </button>
                 ))}
               </div>
 
               <label className="block">
-                <span className="text-xs font-semibold text-muted-foreground">{kind === "Study session" ? "Topic" : "Title"}</span>
-                <Input value={title} onChange={event => setTitle(event.target.value)} placeholder={kind === "Study session" ? "Cost behavior recap" : `New ${kind.toLowerCase()}`} className="mt-1.5" />
+                <span className="text-xs font-semibold text-muted-foreground">{kind === "Study session" ? "Topic" : kind === "Custom course" ? "Course name" : "Title"}</span>
+                <Input value={title} onChange={event => setTitle(event.target.value)} placeholder={kind === "Study session" ? "Cost behavior recap" : kind === "Custom course" ? "Digital Marketing (MOOC)" : `New ${kind.toLowerCase()}`} className="mt-1.5" />
               </label>
 
-              {kind !== "Study session" && (
+              {needsCourse && (
                 <label className="block">
                   <span className="text-xs font-semibold text-muted-foreground">Course</span>
                   <select value={course} onChange={event => setCourse(event.target.value)} className="mt-1.5 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm">
@@ -142,6 +154,33 @@ export function QuickAdd({
                   <label className="block">
                     <span className="text-xs font-semibold text-muted-foreground">Duration</span>
                     <Input value={duration} onChange={event => setDuration(event.target.value)} className="mt-1.5" />
+                  </label>
+                </div>
+              )}
+
+              {kind === "Custom course" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="text-xs font-semibold text-muted-foreground">Provider</span>
+                    <Input value={provider} onChange={event => setProvider(event.target.value)} placeholder="MOOC, MBKM, exchange…" className="mt-1.5" />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold text-muted-foreground">Credits (SKS)</span>
+                    <Input type="number" min={0} value={sks} onChange={event => setSks(event.target.value)} className="mt-1.5" />
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold text-muted-foreground">Day</span>
+                    <select value={courseDay} onChange={event => setCourseDay(event.target.value)} className="mt-1.5 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm">
+                      {fullDays.map(item => <option key={item}>{item}</option>)}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-semibold text-muted-foreground">Time</span>
+                    <Input value={courseTime} onChange={event => setCourseTime(event.target.value)} className="mt-1.5" />
+                  </label>
+                  <label className="col-span-2 block">
+                    <span className="text-xs font-semibold text-muted-foreground">Room or platform</span>
+                    <Input value={room} onChange={event => setRoom(event.target.value)} placeholder="B.211 or Coursera" className="mt-1.5" />
                   </label>
                 </div>
               )}
