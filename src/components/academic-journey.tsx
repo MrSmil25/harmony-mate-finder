@@ -8,6 +8,7 @@ import { TOTAL_SKS, courseByCode, curriculum, curriculumStructure, type Curricul
 import { academicYearLabel } from "@/data/semester";
 import type { StudentSetup } from "@/data/setup";
 import { missingPrereqs, recommendNextSemester, statusLabel, statusStyle, useRoadmap, type CourseStatus } from "@/data/roadmap";
+import { EmptyState } from "@/components/empty-state";
 
 const CURRICULUM_YEAR = 2024;
 const SEMESTERS = Array.from({ length: 8 }, (_, index) => index + 1);
@@ -421,7 +422,14 @@ function AdditionalLearning({
       )}
 
       {custom.length === 0 ? (
-        <div className="academic-card p-5 text-sm text-muted-foreground">No additional courses yet. Record MOOCs, MBKM, exchange, or certifications here.</div>
+        <EmptyState
+          icon={Sparkles}
+          eyebrow="Beyond the curriculum"
+          title="Your learning outside the curriculum counts too"
+          description="Record MOOCs, MBKM programmes, student exchange, certifications, or bootcamps. Credits you record here are added to your recorded learning."
+          actions={[{ label: open ? "Fill in the form above" : "Add your first course", icon: Plus, onClick: () => setOpen(true) }]}
+          hints={["Coursera, edX, or campus certification programmes", "MBKM, internship conversion, or exchange semesters"]}
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {custom.map((item) => (
