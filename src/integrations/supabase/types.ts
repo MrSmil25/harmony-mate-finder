@@ -203,7 +203,6 @@ export type Database = {
       }
       curriculum_courses: {
         Row: {
-          category: string | null
           code: string
           course_group: string | null
           created_at: string
@@ -213,10 +212,8 @@ export type Database = {
           program_id: string | null
           semester: number | null
           sks: number
-          track: string | null
         }
         Insert: {
-          category?: string | null
           code: string
           course_group?: string | null
           created_at?: string
@@ -226,10 +223,8 @@ export type Database = {
           program_id?: string | null
           semester?: number | null
           sks?: number
-          track?: string | null
         }
         Update: {
-          category?: string | null
           code?: string
           course_group?: string | null
           created_at?: string
@@ -239,7 +234,6 @@ export type Database = {
           program_id?: string | null
           semester?: number | null
           sks?: number
-          track?: string | null
         }
         Relationships: [
           {
@@ -254,56 +248,35 @@ export type Database = {
       custom_courses: {
         Row: {
           code: string
-          counts_toward_graduation: boolean
           course_group: string | null
           created_at: string
-          day: string | null
-          end_time: string | null
-          faculty: string | null
           id: string
-          lecturer: string | null
           name: string
           note: string | null
-          room: string | null
           semester: number | null
           sks: number
-          start_time: string | null
           user_id: string
         }
         Insert: {
           code: string
-          counts_toward_graduation?: boolean
           course_group?: string | null
           created_at?: string
-          day?: string | null
-          end_time?: string | null
-          faculty?: string | null
           id?: string
-          lecturer?: string | null
           name: string
           note?: string | null
-          room?: string | null
           semester?: number | null
           sks?: number
-          start_time?: string | null
           user_id?: string
         }
         Update: {
           code?: string
-          counts_toward_graduation?: boolean
           course_group?: string | null
           created_at?: string
-          day?: string | null
-          end_time?: string | null
-          faculty?: string | null
           id?: string
-          lecturer?: string | null
           name?: string
           note?: string | null
-          room?: string | null
           semester?: number | null
           sks?: number
-          start_time?: string | null
           user_id?: string
         }
         Relationships: []
@@ -465,11 +438,8 @@ export type Database = {
         Row: {
           code: string
           created_at: string
-          curriculum_year: number
-          degree: string | null
           faculty: string
           id: string
-          is_active: boolean
           name: string
           total_sks: number
           university: string
@@ -477,11 +447,8 @@ export type Database = {
         Insert: {
           code: string
           created_at?: string
-          curriculum_year?: number
-          degree?: string | null
           faculty: string
           id?: string
-          is_active?: boolean
           name: string
           total_sks?: number
           university: string
@@ -489,11 +456,8 @@ export type Database = {
         Update: {
           code?: string
           created_at?: string
-          curriculum_year?: number
-          degree?: string | null
           faculty?: string
           id?: string
-          is_active?: boolean
           name?: string
           total_sks?: number
           university?: string
