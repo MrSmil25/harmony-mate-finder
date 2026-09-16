@@ -2,9 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   ArrowLeft, BookOpen, CalendarDays, Check, CheckCircle2, ChevronRight, Clock3,
   Download, ExternalLink, FileText, Flag, GraduationCap, Hand, Home, Library, Link2, ListTodo,
-  MapPin, Milestone, MoreHorizontal, Paperclip, Pencil, Plus, Save, Search, Trash2, UserRound, X,
+  MapPin, Milestone, MoreHorizontal, NotebookPen, Paperclip, Pencil, Plus, Save, Search, Settings, Trash2, UserRound, X,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,8 +24,29 @@ import { degreeProgress, useSetup, type StudentSetup } from "@/data/setup";
 import { courseByCode, type CurriculumCourse } from "@/data/curriculum";
 import { academicYearLabel, useSemesterData, type AssistantSession, type CourseLink } from "@/data/semester";
 import { AssistantSessionList, AssistantSessionsPanel, CourseLinksPanel, SemesterArchivePanel, SemesterWorkspaceCard } from "@/components/semester-workspace";
+import { EmptyState } from "@/components/empty-state";
+import { SettingsView } from "@/components/settings";
+import type { AcademicExport } from "@/lib/export-data";
 
-type View = "home" | "courses" | "calendar" | "tasks" | "library";
+type View = "home" | "courses" | "calendar" | "tasks" | "library" | "settings";
+
+const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** Local clock for greeting and date, resolved after hydration to avoid SSR drift. */
+function useNow() {
+  const [now, setNow] = useState<Date | null>(null);
+  useEffect(() => {
+    setNow(new Date());
+    const timer = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const hour = now?.getHours() ?? 8;
+  return {
+    greeting: hour < 11 ? "Good morning" : hour < 15 ? "Good afternoon" : hour < 19 ? "Good evening" : "Good night",
+    dayName: now ? weekdayNames[now.getDay()]! : "Wednesday",
+    dateLabel: now ? now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }) : "Wednesday, 16 September",
+  };
+}
 type TaskCategory = "Accounting" | "Marketing" | "Entrepreneurship" | "Research";
 type TaskStatus = "Not started" | "In progress" | "Completed";
 type ChecklistItem = { id: number; label: string; done: boolean };
@@ -289,15 +310,16 @@ function AcademicApp() {
 
   return (
     <div className="min-h-screen bg-background pb-24 text-foreground md:pb-8">
-      <DesktopHeader view={view} navigate={navigate} onSearch={() => setSearchOpen(true)} onNotifications={() => setNotifOpen(true)} notificationCount={notifications.length} />
+      <DesktopHeader view={view} navigate={navigate} onSearch={() => setSearchOpen(true)} onNotifications={() => setNotifOpen(true)} notificationCount={notifications.length} onSettings={() => navigate("settings")} />
       <main className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6 md:py-8">
         {exam ? <StudyCommandCenter event={exam} onBack={() => setExam(null)} sessions={studySessions} onAddSession={addStudySession} onRemoveSession={removeStudySession} /> : workspace ? <CourseWorkspace course={workspace} onBack={() => setWorkspace(null)} onOpenExam={openExamForCourse} links={semesterData.links.filter((link) => link.code === workspace.code)} onAddLink={semesterData.addLink} onRemoveLink={semesterData.removeLink} sessions={semesterData.sessions.filter((session) => session.code === workspace.code)} onAddSession={semesterData.addSession} onRemoveSession={semesterData.removeSession} /> : journey ? <AcademicJourney onBack={() => setJourney(false)} onOpenCourse={openCurriculumCourse} setup={setup} /> : (
           <div key={view} className="page-enter">
-            {view === "home" && <HomeView tasks={tasks} toggleTask={toggleTask} navigate={navigate} onOpenExam={setExam} onOpenJourney={() => { setJourney(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} onSearch={() => setSearchOpen(true)} onNotifications={() => setNotifOpen(true)} notificationCount={notifications.length} studySessions={studySessions.length} resourcesAdded={resourcesAdded + notesAdded} profile={setup} myCourses={myCourses} onEditSetup={resetSetup} semesterData={semesterData} />}
+            {view === "home" && <HomeView tasks={tasks} toggleTask={toggleTask} navigate={navigate} onOpenExam={setExam} onOpenJourney={() => { setJourney(true); window.scrollTo({ top: 0, behavior: "smooth" }); }} onSearch={() => setSearchOpen(true)} onNotifications={() => setNotifOpen(true)} notificationCount={notifications.length} studySessions={studySessions.length} resourcesAdded={resourcesAdded + notesAdded} profile={setup} myCourses={myCourses} onEditSetup={resetSetup} semesterData={semesterData} onSettings={() => navigate("settings")} />}
             {view === "courses" && <CoursesView onOpen={setWorkspace} courses={myCourses} semesterLabel={setup ? `Semester ${setup.currentSemester}` : "Semester Gasal 2026/2027"} />}
             {view === "calendar" && <CalendarView studySessions={studySessions} assistantSessions={semesterData.sessions} />}
             {view === "tasks" && <TasksView tasks={tasks} toggleTask={toggleTask} updateTask={updateTask} addTask={addTask} navigate={navigate} />}
             {view === "library" && <LibraryView />}
+            {view === "settings" && <SettingsView setup={setup} data={exportData} progress={degreeProgress(setup?.completed ?? [])} onBack={() => navigate("home")} onEditSetup={resetSetup} />}
           </div>
         )}
       </main>
