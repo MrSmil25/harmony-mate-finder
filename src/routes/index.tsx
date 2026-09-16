@@ -297,6 +297,17 @@ function AcademicApp() {
   const updateTask = (id: number, patch: Partial<Task>) => setTasks((items) => items.map((task) => task.id === id ? { ...task, ...patch } : task));
   const addTask = (task: Task) => setTasks((items) => [task, ...items]);
 
+  const exportData = useMemo<AcademicExport>(() => {
+    const stats = degreeProgress(setup?.completed ?? []);
+    return {
+      courses: myCourses.map((course) => ({ code: course.code, title: course.title, sks: course.sks, section: course.section, lecturer: course.lecturer, assistant: course.assistant, day: course.day, time: course.time, room: course.room })),
+      tasks: tasks.map((task) => ({ title: task.title, course: task.course, due: task.dueDate || task.due, priority: task.priority, status: task.status, done: task.done })),
+      notes: myCourses.flatMap((course) => course.notes.map((note) => ({ title: note.title, topic: note.topic, course: course.title, body: note.body }))),
+      resources: myCourses.flatMap((course) => course.materials.map((material) => ({ title: material.title, type: material.type, course: course.title, detail: material.attachment }))),
+      progress: { currentSemester: setup?.currentSemester ?? studentProfile.currentSemester, completedSks: stats.completedSks, remainingSks: stats.remainingSks, totalSks: stats.totalSks, percent: stats.percent, completedCourses: setup?.completed ?? [] },
+    };
+  }, [myCourses, tasks, setup]);
+
   const openCourseByCode = (code: string) => {
     const found = myCourses.find((course) => course.code === code);
     if (found) { setExam(null); setJourney(false); setWorkspace(found); window.scrollTo({ top: 0, behavior: "smooth" }); }
@@ -338,6 +349,15 @@ function AcademicApp() {
         onAddNote={() => setNotesAdded((count) => count + 1)}
         onAddResource={() => setResourcesAdded((count) => count + 1)}
         onAddSession={({ day, date, time, duration, topic }) => addStudySession({ eventId: exam?.id ?? 1, day, date, time, duration, topic })}
+        onAddCourse={({ name, provider, sks, day, time, room }) => {
+          if (!setup) return;
+          const custom = {
+            code: `EXTRA-${Date.now()}`, name, faculty: provider, sks,
+            lecturer: provider, day: (day as StudentSetup["active"][number]["day"]), start: time.split(" – ")[0] ?? "08:00",
+            end: time.split(" – ")[1] ?? "10:00", room, countsTowardGraduation: false,
+          };
+          saveSetup({ ...setup, customCourses: [...(setup.customCourses ?? []), custom] });
+        }}
       />
 
       <GlobalSearch
