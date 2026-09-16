@@ -300,7 +300,7 @@ function AcademicApp() {
   const exportData = useMemo<AcademicExport>(() => {
     const stats = degreeProgress(setup?.completed ?? []);
     return {
-      courses: myCourses.map((course) => ({ code: course.code, title: course.title, sks: course.sks, section: course.section, lecturer: course.lecturer, assistant: course.assistant, day: course.day, time: course.time, room: course.room })),
+      courses: myCourses.map((course) => ({ code: course.code, title: course.title, sks: course.sks, ...(course.section ? { section: course.section } : {}), lecturer: course.lecturer, assistant: course.assistant, day: course.day, time: course.time, room: course.room })),
       tasks: tasks.map((task) => ({ title: task.title, course: task.course, due: task.dueDate || task.due, priority: task.priority, status: task.status, done: task.done })),
       notes: myCourses.flatMap((course) => course.notes.map((note) => ({ title: note.title, topic: note.topic, course: course.title, body: note.body }))),
       resources: myCourses.flatMap((course) => course.materials.map((material) => ({ title: material.title, type: material.type, course: course.title, detail: material.attachment }))),
